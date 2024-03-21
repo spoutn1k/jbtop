@@ -1,0 +1,22 @@
+[package]
+name = "jbtop"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4.20"
+lustre_collector = "0.7.8"
+russh = { version = "0.42.0", features = ["openssl"] }
+russh-keys = { version = "0.42.0", features = ["openssl"] }
+tokio = { version = "1.36.0", features = ["full"] }
+simple_logger = { version = "4.3.3", features = ["stderr", "threads"] }
+async-trait = "0.1.77"
+nodeset = "0.4.1"
+
+ratatui = {version =  "0.26.1", features = ["serde", "all-widgets"]}
+crossterm = {version =  "0.27.0", features = ["serde","event-stream"]}
+
+futures = "0.3"
+futures-core = "0.3.30"
