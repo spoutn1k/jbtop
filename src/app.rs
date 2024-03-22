@@ -7,7 +7,7 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 #[derive(Debug)]
 pub enum HostState {
     Connecting,
-    Up(f32, f32, f32),
+    Up(String),
     Down(String),
 }
 
@@ -56,5 +56,29 @@ impl App {
         if let Some(res) = self.counter.checked_sub(1) {
             self.counter = res;
         }
+    }
+
+    pub fn set_host_connecting(&mut self, host: &str) {
+        let state = HostState::Connecting;
+        self.hosts
+            .entry(host.to_string())
+            .and_modify(|v| *v = state)
+            .or_insert(HostState::Connecting);
+    }
+
+    pub fn set_host_status(&mut self, host: &str, load: &str) {
+        let state = HostState::Up(load.to_string());
+        self.hosts
+            .entry(host.to_string())
+            .and_modify(|v| *v = state)
+            .or_insert(HostState::Up(load.to_string()));
+    }
+
+    pub fn set_host_error(&mut self, host: &str, error: &str) {
+        let state = HostState::Down(error.to_string());
+        self.hosts
+            .entry(host.to_string())
+            .and_modify(|v| *v = state)
+            .or_insert(HostState::Down(error.to_string()));
     }
 }

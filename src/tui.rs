@@ -17,7 +17,10 @@ use tokio::sync::mpsc;
 pub struct Tui<B: Backend> {
     /// Interface to the Terminal.
     terminal: Terminal<B>,
+    /// Sender end of the Tui's channel. Never actually used by this struct but a clone of it is
+    /// passed to any new EventHandlers
     sender: mpsc::UnboundedSender<Event>,
+    /// Receiving end of the Tui's channel, all events are read from here
     receiver: mpsc::UnboundedReceiver<Event>,
 }
 

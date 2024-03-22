@@ -8,7 +8,7 @@ use jbtop::ssh;
 
 use jbtop::app::{App, AppResult};
 use jbtop::event::{Event, EventHandler};
-use jbtop::handler::handle_key_events;
+use jbtop::handler::{handle_host_events, handle_key_events, handle_load_events};
 use jbtop::tui::Tui;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
@@ -47,7 +47,7 @@ async fn main() -> AppResult<()> {
     for node in nodes.iter() {
         let connection = Arc::new(ssh::Session::new(&node).await.ok());
         session_pool.insert(node.clone(), Arc::clone(&connection));
-        events.push(EventHandler::uptime(tui.channel(), node, connection));
+        events.push(EventHandler::load(tui.channel(), node, connection));
     }
 
     tui.init()?;
@@ -62,8 +62,8 @@ async fn main() -> AppResult<()> {
             Event::Key(key_event) => handle_key_events(key_event, &mut app)?,
             Event::Mouse(_) => {}
             Event::Resize(_, _) => {}
-            Event::Uptime(host, output) => log::info!("Host {} has load {}", host, output),
-            _ => (),
+            Event::HostStatus(host, event) => handle_host_events(&host, event, &mut app)?,
+            Event::LoadStatus(host, event) => handle_load_events(&host, event, &mut app)?,
         }
     }
 

@@ -6,6 +6,18 @@ use tokio::sync::mpsc;
 
 use crate::ssh;
 
+#[derive(Clone, Debug)]
+pub enum LoadEvent {
+    Load(String),
+    LoadError(String),
+}
+
+#[derive(Clone, Debug)]
+pub enum ConnectionEvent {
+    Connecting,
+    Connected,
+}
+
 /// Terminal events.
 #[derive(Clone, Debug)]
 pub enum Event {
@@ -18,10 +30,8 @@ pub enum Event {
     /// Terminal resize.
     Resize(u16, u16),
 
-    HostConnecting(String),
-    Uptime(String, String),
-    UptimeError(String, String),
-    ConnectionError(String, String),
+    HostStatus(String, ConnectionEvent),
+    LoadStatus(String, LoadEvent),
 }
 
 /// Terminal event handler.
@@ -76,7 +86,7 @@ impl EventHandler {
         Self { handler }
     }
 
-    pub fn uptime(
+    pub fn load(
         sender: mpsc::UnboundedSender<Event>,
         hostname: &str,
         session: std::sync::Arc<Option<ssh::Session>>,
@@ -84,20 +94,48 @@ impl EventHandler {
         let _host = hostname.to_string();
         let handler = tokio::spawn(async move {
             sender
-                .send(Event::HostConnecting(_host.to_string()))
+                .send(Event::HostStatus(
+                    _host.to_string(),
+                    ConnectionEvent::Connecting,
+                ))
                 .unwrap();
             let mut tick = tokio::time::interval(tokio::time::Duration::from_millis(1000));
             loop {
-                let mut channel = (*session).as_ref().unwrap().open_channel().await.unwrap();
-                let event = match channel.block_exec("cat /proc/loadavg").await {
-                    Ok((c, o, _)) if c == 0 => Event::Uptime(_host.to_string(), o),
-                    Ok((_, _, e)) => Event::UptimeError(_host.to_string(), e),
-                    Err(e) => Event::UptimeError(_host.to_string(), e.to_string()),
+                tick.tick().await;
+
+                let session = (*session).as_ref();
+                if session.is_none() {
+                    sender
+                        .send(Event::LoadStatus(
+                            _host.to_string(),
+                            LoadEvent::LoadError("Failed to access session".to_string()),
+                        ))
+                        .unwrap();
+                    continue;
+                }
+
+                let channel = session.unwrap().open_channel().await;
+                if let Err(e) = channel {
+                    sender
+                        .send(Event::LoadStatus(
+                            _host.to_string(),
+                            LoadEvent::LoadError(e.to_string()),
+                        ))
+                        .unwrap();
+                    continue;
+                }
+
+                let event = match channel.unwrap().block_exec("cat /proc/loadavg").await {
+                    Ok((c, o, _)) if c == 0 => {
+                        Event::LoadStatus(_host.to_string(), LoadEvent::Load(o))
+                    }
+                    Ok((_, _, e)) => Event::LoadStatus(_host.to_string(), LoadEvent::LoadError(e)),
+                    Err(e) => {
+                        Event::LoadStatus(_host.to_string(), LoadEvent::LoadError(e.to_string()))
+                    }
                 };
 
                 sender.send(event).unwrap();
-
-                tick.tick().await;
             }
         });
 

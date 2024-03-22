@@ -1,11 +1,12 @@
 use ratatui::{
     layout::Alignment,
+    prelude::*,
     style::{Color, Style},
-    widgets::{Block, BorderType, Paragraph},
+    widgets::*,
     Frame,
 };
 
-use crate::app::App;
+use crate::app::{App, HostState};
 
 /// Renders the user interface widgets.
 pub fn render(app: &mut App, frame: &mut Frame) {
@@ -13,22 +14,32 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // See the following resources:
     // - https://docs.rs/ratatui/latest/ratatui/widgets/index.html
     // - https://github.com/ratatui-org/ratatui/tree/master/examples
-    frame.render_widget(
-        Paragraph::new(format!(
-            "This is a tui template.\n\
-                Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
-                Press left and right to increment and decrement the counter respectively.\n\
-                Counter: {}",
-            app.counter
-        ))
-        .block(
-            Block::bordered()
-                .title("Template")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Rounded),
-        )
-        .style(Style::default().fg(Color::Cyan).bg(Color::Black))
-        .centered(),
-        frame.size(),
-    )
+
+    let header = Row::new(vec!["host", "load"]);
+    let widths = [Constraint::Percentage(25), Constraint::Fill(1)];
+
+    let content: Vec<Row> = app
+        .hosts
+        .iter()
+        .map(|(host, status)| match status {
+            HostState::Connecting => Row::new(vec![
+                Cell::from(host.as_str()).style(Style::default().fg(Color::Yellow)),
+                Cell::from("Connecting ...").style(Style::default()),
+            ]),
+            HostState::Up(content) => Row::new(vec![
+                Cell::from(host.as_str()).style(Style::default().fg(Color::Green)),
+                Cell::from(content.as_str()).style(Style::default()),
+            ]),
+            HostState::Down(content) => Row::new(vec![
+                Cell::from(host.as_str()).style(Style::default().fg(Color::Red)),
+                Cell::from(content.as_str()).style(Style::default()),
+            ]),
+        })
+        .collect();
+
+    let load_table = Table::new(content, widths)
+        .column_spacing(1)
+        .header(header.style(Style::new().bold()));
+
+    frame.render_widget(load_table, frame.size())
 }
