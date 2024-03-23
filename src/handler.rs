@@ -37,6 +37,7 @@ pub fn handle_host_events(
     match event {
         event::ConnectionEvent::Connected => {}
         event::ConnectionEvent::Connecting => app.set_host_connecting(host),
+        event::ConnectionEvent::ConnectionError(error) => app.set_host_error(host, &error),
     }
 
     Ok(())

@@ -1,18 +1,13 @@
-use log::LevelFilter;
-use simple_logger::SimpleLogger;
-use std::collections::HashMap;
-use std::error::Error;
-use std::sync::Arc;
-
-use jbtop::ssh;
-
 use jbtop::app::{App, AppResult};
 use jbtop::event::{Event, EventHandler};
 use jbtop::handler::{handle_host_events, handle_key_events, handle_load_events};
+use jbtop::ssh;
 use jbtop::tui::Tui;
-use ratatui::backend::CrosstermBackend;
-use ratatui::Terminal;
-use std::io;
+use log::LevelFilter;
+use ratatui::{backend::CrosstermBackend, Terminal};
+use simple_logger::SimpleLogger;
+use std::{collections::HashMap, error::Error, io, sync::Arc};
+use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> AppResult<()> {
@@ -43,11 +38,20 @@ async fn main() -> AppResult<()> {
 
     let mut events: Vec<EventHandler> = vec![EventHandler::terminal(tui.channel(), 250)];
 
-    let mut session_pool = HashMap::<String, Arc<Option<ssh::Session>>>::new();
+    let mut session_pool = HashMap::<String, Arc<Mutex<Option<ssh::Session>>>>::new();
     for node in nodes.iter() {
-        let connection = Arc::new(ssh::Session::new(&node).await.ok());
-        session_pool.insert(node.clone(), Arc::clone(&connection));
-        events.push(EventHandler::load(tui.channel(), node, connection));
+        let connection = Arc::new(Mutex::new(None));
+        events.push(EventHandler::connection(
+            tui.channel(),
+            node,
+            Arc::clone(&connection),
+        ));
+        events.push(EventHandler::load(
+            tui.channel(),
+            node,
+            Arc::clone(&connection),
+        ));
+        session_pool.insert(node.clone(), connection);
     }
 
     tui.init()?;
